@@ -60,7 +60,7 @@ Enable the Snyk Security Scanner in the project configuration page. To add Snyk 
 - **Monitor project on build** - Take a current application dependencies snapshot for continuous monitoring by Snyk.
 - **Snyk token** - The ID for the API token from the Credentials plugin to be used to authenticate with Snyk (credential type must be "Snyk API token").
 - **Target file** - The path to the application manifest file to be scanned by Snyk Security Scanner.
-- **Organisation** - The Snyk organisation in which this project should be tested and monitored.
+- **Organization** - The ID of the Snyk organization in which this project should be tested and monitored.
 - **Project name** - A custom name for the Snyk project created for this Jenkins project on every build.
 
 #### Advanced Configuration
@@ -83,7 +83,7 @@ The `snykSecurity` function accepts the following parameters:
 - **snykTokenId** - The ID of the API token from the Credentials plugin to be used to authenticate to Snyk.
 - **additionalArguments** (optional, default **none**) - Refer to the [Snyk CLI](https://snyk.io/docs/using-snyk/) help page for information on additional arguments.
 - **failOnIssues** (optional, default **true**) - This specifies if builds should be failed or continued based on issues found by Snyk.
-- **organisation** (optional, default **none**) - The Snyk organisation in which this project should be tested and monitored.
+- **organisation** (optional, default **none**) - The ID of the Snyk organization in which this project should be tested and monitored.
 - **projectName** (optional, default **none**) - A custom name for the Snyk project created for this Jenkins project on every build.
 - **severity** (optional, default **low**) - Only report vulnerabilities of provided level or higher (low/medium/high/critical). Default is low.
 - **targetFile** (optional, default **none**) - The path to the manifest file to be used by Snyk.
