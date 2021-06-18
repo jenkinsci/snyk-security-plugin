@@ -323,7 +323,7 @@ public class SnykStepBuilder extends Builder {
       if (build.getActions(SnykReportBuildAction.class).isEmpty()) {
         build.addAction(new SnykReportBuildAction(build));
       }
-      ArtifactArchiver artifactArchiver = new ArtifactArchiver(workspace.getName() + "_" + SNYK_REPORT_HTML);
+      ArtifactArchiver artifactArchiver = new ArtifactArchiver(workspace.getName() + "_" + getHtmlReportFileName());
       artifactArchiver.perform(build, workspace, launcher, log);
 
     } catch (IOException | InterruptedException | RuntimeException ex) {
@@ -380,6 +380,15 @@ public class SnykStepBuilder extends Builder {
     return args;
   }
 
+  private String getHtmlReportFileName(){
+    if(fixEmptyAndTrim(projectName) != null){
+      return projectName + "_" + SNYK_REPORT_HTML;
+    }
+    else{
+      return SNYK_REPORT_HTML;
+    }
+  }
+
   private void generateSnykHtmlReport(Run<?, ?> build, @Nonnull FilePath workspace, Launcher launcher, TaskListener log, String reportExecutable, String monitorUri) throws IOException, InterruptedException {
     EnvVars env = build.getEnvironment(log);
     ArgumentListBuilder args = new ArgumentListBuilder();
@@ -390,10 +399,10 @@ public class SnykStepBuilder extends Builder {
       return;
     }
 
-    workspace.child(SNYK_REPORT_HTML).write("", UTF_8.name());
+    workspace.child(getHtmlReportFileName()).write("", UTF_8.name());
 
     args.add(reportExecutable);
-    args.add("-i", SNYK_TEST_REPORT_JSON, "-o", SNYK_REPORT_HTML);
+    args.add("-i", SNYK_TEST_REPORT_JSON, "-o", getHtmlReportFileName());
     try {
       int exitCode = launcher.launch()
                              .cmds(args)
@@ -405,10 +414,10 @@ public class SnykStepBuilder extends Builder {
       if (!success) {
         log.getLogger().println("Generating Snyk html report was not successful");
       }
-      String reportWithInlineCSS = workspace.child(SNYK_REPORT_HTML).readToString();
+      String reportWithInlineCSS = workspace.child(getHtmlReportFileName()).readToString();
       String modifiedHtmlReport = ReportConverter.getInstance().modifyHeadSection(reportWithInlineCSS);
       String finalHtmlReport = ReportConverter.getInstance().injectMonitorLink(modifiedHtmlReport, monitorUri);
-      workspace.child(workspace.getName() + "_" + SNYK_REPORT_HTML).write(finalHtmlReport, UTF_8.name());
+      workspace.child(workspace.getName() + "_" + getHtmlReportFileName()).write(finalHtmlReport, UTF_8.name());
     } catch (IOException ex) {
       Util.displayIOException(ex, log);
       ex.printStackTrace(log.fatalError("Snyk-to-Html command execution failed"));
