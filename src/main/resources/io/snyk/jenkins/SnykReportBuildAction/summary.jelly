@@ -1,6 +1,6 @@
 <?jelly escape-by-default="true"?>
 <j:jelly xmlns:j="jelly:core" xmlns:t="/lib/hudson">
-  <t:summary icon="${it.getIconFileName}">
-    <a href="${it.urlName}">${it.displayName}</a>
+  <t:summary icon="${it.getIconFileName()}">
+    <a href="${it.getUrlName()}">${it.getDisplayName()}</a>
   </t:summary>
 </j:jelly>

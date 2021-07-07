@@ -3,6 +3,7 @@ package io.snyk.jenkins.model;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
@@ -88,6 +89,9 @@ public class ObjectMapperHelper {
       } else if ("dependencyCount".equals(fieldName)) {
         parser.nextToken();
         snykTestResult.dependencyCount = parser.getIntValue();
+      } else if ("projectName".equals(fieldName)) {
+        parser.nextToken();
+        snykTestResult.projectName = parser.getText();
       } else {
         parser.skipChildren();
       }
@@ -107,6 +111,10 @@ public class ObjectMapperHelper {
       aggregatedTestResult.dependencyCount += entity.dependencyCount;
       aggregatedTestResult.uniqueCount += entity.uniqueCount;
     });
+
+    aggregatedTestResult.projectName = testResults.stream()
+      .map(result -> result.projectName)
+      .collect(Collectors.joining(", "));
 
     return aggregatedTestResult;
   }

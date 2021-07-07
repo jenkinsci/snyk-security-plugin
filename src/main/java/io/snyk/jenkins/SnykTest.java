@@ -23,7 +23,7 @@ public class SnykTest {
 
   private static final Logger LOG = LoggerFactory.getLogger(SnykTest.class);
 
-  public static String testProject(
+  public static Result testProject(
     SnykContext context,
     SnykConfig config,
     SnykInstallation installation,
@@ -85,6 +85,24 @@ public class SnykTest {
       );
     }
 
-    return reportJson;
+    return new Result(result.projectName, reportJson);
+  }
+
+  public static class Result {
+    private final String name;
+    private final String json;
+
+    public Result(String name, String json) {
+      this.name = name;
+      this.json = json;
+    }
+
+    public String getName() {
+      return name;
+    }
+
+    public String getJson() {
+      return json;
+    }
   }
 }

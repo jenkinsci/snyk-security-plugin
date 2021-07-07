@@ -5,4 +5,5 @@ public class SnykTestResult {
   public String error;
   public int dependencyCount;
   public int uniqueCount;
+  public String projectName;
 }

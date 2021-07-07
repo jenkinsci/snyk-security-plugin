@@ -2,14 +2,16 @@
 <j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:l="/lib/layout">
   <l:layout title="Snyk Security Report" norefresh="true">
     <l:side-panel>
-      <st:include page="sidepanel.jelly" it="${it.run}" optional="true"/>
+      <st:include page="sidepanel.jelly" it="${it.getRun()}" optional="true"/>
     </l:side-panel>
     <l:main-panel>
       <h3>Reports</h3>
       <ul>
-        <li>
-          <a href="./report">View report</a>
-        </li>
+        <j:forEach var="link" items="${it.getReportLinks().entrySet()}">
+          <li>
+            <a href="${link.getValue()}">${link.getKey()}</a>
+          </li>
+        </j:forEach>
       </ul>
     </l:main-panel>
   </l:layout>

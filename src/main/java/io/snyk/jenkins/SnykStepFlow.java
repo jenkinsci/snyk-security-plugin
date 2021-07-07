@@ -10,6 +10,7 @@ import io.snyk.jenkins.exception.SnykIssueException;
 import io.snyk.jenkins.tools.SnykInstallation;
 
 import java.io.IOException;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
@@ -51,16 +52,24 @@ public class SnykStepFlow {
 
     context.getEnvVars().put("SNYK_TOKEN", SnykApiToken.getToken(context, config.getSnykTokenId()));
 
-    String testJson = SnykTest.testProject(context, config, installation, testExitCode);
-    String report = SnykToHTML.generateReport(context, installation, testJson);
-
-    Run<?, ?> run = context.getRun();
-    if (run.getActions(SnykReportBuildAction.class).isEmpty()) {
-      run.addAction(new SnykReportBuildAction(report));
-    }
+    SnykTest.Result testResult = SnykTest.testProject(context, config, installation, testExitCode);
+    String htmlResult = SnykToHTML.generateReport(context, installation, testResult.getJson());
+    addReportAction(context, testResult.getName(), htmlResult);
 
     if (config.isMonitorProjectOnBuild()) {
       SnykMonitor.monitorProject(context, config, installation);
     }
+  }
+
+  private static void addReportAction(SnykContext context, String name, String report) {
+    Run<?, ?> run = context.getRun();
+    Optional.ofNullable(run.getAction(SnykReportBuildAction.class))
+      .orElseGet(() -> {
+        SnykReportBuildAction newAction = new SnykReportBuildAction();
+        run.addAction(newAction);
+        return newAction;
+      })
+      .getReports()
+      .put(name, report);
   }
 }
