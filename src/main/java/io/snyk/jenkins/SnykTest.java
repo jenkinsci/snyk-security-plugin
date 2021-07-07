@@ -1,9 +1,6 @@
 package io.snyk.jenkins;
 
-import hudson.AbortException;
-import hudson.EnvVars;
-import hudson.FilePath;
-import hudson.Launcher;
+import hudson.*;
 import hudson.util.ArgumentListBuilder;
 import io.snyk.jenkins.command.Command;
 import io.snyk.jenkins.command.CommandLine;
@@ -14,83 +11,80 @@ import io.snyk.jenkins.tools.SnykInstallation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.io.PrintStream;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
-import static hudson.Util.fixEmptyAndTrim;
-import static io.snyk.jenkins.config.SnykConstants.SNYK_TEST_REPORT_JSON;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class SnykTest {
 
   private static final Logger LOG = LoggerFactory.getLogger(SnykTest.class);
 
-  public static int testProject(
+  public static String testProject(
     SnykContext context,
     SnykConfig config,
-    SnykInstallation installation
+    SnykInstallation installation,
+    AtomicInteger exitCode
   ) throws IOException, InterruptedException {
     PrintStream logger = context.getLogger();
     FilePath workspace = context.getWorkspace();
     Launcher launcher = context.getLauncher();
     EnvVars envVars = context.getEnvVars();
 
-    int testExitCode;
-
-    FilePath snykTestReport = workspace.child(SNYK_TEST_REPORT_JSON);
-    FilePath snykTestDebug = workspace.child(SNYK_TEST_REPORT_JSON + ".debug");
-
-    ArgumentListBuilder testCommand = CommandLine.asArgumentList(
+    ArgumentListBuilder command = CommandLine.asArgumentList(
       installation.getSnykExecutable(launcher),
       Command.TEST,
       config,
       envVars
     );
 
-    try (
-      OutputStream snykTestOutput = snykTestReport.write();
-      OutputStream snykTestDebugOutput = snykTestDebug.write()
-    ) {
-      logger.println("Testing for known issues...");
-      logger.println("> " + testCommand);
-      testExitCode = launcher.launch()
-        .cmds(testCommand)
+    ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+
+    logger.println("Testing for known issues...");
+    logger.println("> " + command);
+    exitCode.set(
+      launcher.launch()
+        .cmds(command)
         .envs(envVars)
-        .stdout(snykTestOutput)
-        .stderr(snykTestDebugOutput)
+        .stdout(stdout)
+        .stderr(logger)
         .quiet(true)
         .pwd(workspace)
-        .join();
-    }
+        .join()
+    );
 
-    String snykTestReportAsString = snykTestReport.readToString();
+    String reportJson = stdout.toString(UTF_8.name());
     if (LOG.isTraceEnabled()) {
-      LOG.trace("Command line arguments: {}", testCommand);
-      LOG.trace("Exit code: {}", testExitCode);
-      LOG.trace("Command standard output: {}", snykTestReportAsString);
-      LOG.trace("Command debug output: {}", snykTestDebug.readToString());
+      LOG.trace("snyk test command: {}", command);
+      LOG.trace("snyk test exit code: {}", exitCode);
+      LOG.trace("snyk test stdout: {}", reportJson);
     }
 
-    SnykTestResult snykTestResult = ObjectMapperHelper.unmarshallTestResult(snykTestReportAsString);
-    if (snykTestResult == null) {
-      throw new AbortException("Could not parse generated json report file.");
+    SnykTestResult result = Optional.ofNullable(ObjectMapperHelper.unmarshallTestResult(reportJson))
+      .orElseThrow(() -> new AbortException("Failed to test project. Could not parse JSON output."));
+
+    Optional.ofNullable(result.error)
+      .map(Util::fixEmptyAndTrim)
+      .ifPresent(error -> {
+        throw new RuntimeException("Failed to test project. " + result.error);
+      });
+
+    if (exitCode.get() >= 2) {
+      throw new AbortException("Failed to test project. (Exit Code: " + exitCode + ")");
     }
-    // exit on cli error immediately
-    if (fixEmptyAndTrim(snykTestResult.error) != null) {
-      throw new AbortException("Error result: " + snykTestResult.error);
-    }
-    if (testExitCode >= 2) {
-      throw new AbortException("An error occurred. Exit code is " + testExitCode);
-    }
-    if (!snykTestResult.ok) {
+
+    if (!result.ok) {
       logger.println("Vulnerabilities found!");
       logger.printf(
         "Result: %s known vulnerabilities | %s dependencies%n",
-        snykTestResult.uniqueCount,
-        snykTestResult.dependencyCount
+        result.uniqueCount,
+        result.dependencyCount
       );
     }
 
-    return testExitCode;
+    return reportJson;
   }
 }

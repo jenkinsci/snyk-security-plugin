@@ -1,11 +1,8 @@
 package io.snyk.jenkins;
 
-import hudson.FilePath;
-import hudson.Launcher;
 import hudson.Util;
 import hudson.model.Run;
 import hudson.model.TaskListener;
-import hudson.tasks.ArtifactArchiver;
 import io.snyk.jenkins.config.SnykConfig;
 import io.snyk.jenkins.credentials.SnykApiToken;
 import io.snyk.jenkins.exception.SnykErrorException;
@@ -13,32 +10,31 @@ import io.snyk.jenkins.exception.SnykIssueException;
 import io.snyk.jenkins.tools.SnykInstallation;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
-
-import static io.snyk.jenkins.config.SnykConstants.SNYK_REPORT_HTML;
 
 public class SnykStepFlow {
 
   public static void perform(SnykConfig config, Supplier<SnykContext> contextSupplier) throws SnykIssueException, SnykErrorException {
-    int testExitCode = 0;
-    Exception cause = null;
     SnykContext context = null;
+    AtomicInteger testExitCode = new AtomicInteger(0);
+    Exception cause = null;
 
     try {
       context = contextSupplier.get();
-      testExitCode = SnykStepFlow.scan(context, config);
+      SnykStepFlow.scan(context, config, testExitCode);
     } catch (IOException | InterruptedException | RuntimeException ex) {
       if (context != null) {
         TaskListener listener = context.getTaskListener();
         if (ex instanceof IOException) {
           Util.displayIOException((IOException) ex, listener);
         }
-        ex.printStackTrace(listener.fatalError("Snyk command execution failed"));
+        ex.printStackTrace(listener.fatalError("Snyk Security failed with errors."));
       }
       cause = ex;
     }
 
-    if (config.isFailOnIssues() && testExitCode == 1) {
+    if (config.isFailOnIssues() && testExitCode.get() == 1) {
       throw new SnykIssueException();
     }
     if (config.isFailOnError() && cause != null) {
@@ -46,7 +42,7 @@ public class SnykStepFlow {
     }
   }
 
-  private static int scan(SnykContext context, SnykConfig config)
+  private static void scan(SnykContext context, SnykConfig config, AtomicInteger testExitCode)
   throws IOException, InterruptedException {
     SnykInstallation installation = SnykInstallation.install(
       context,
@@ -55,25 +51,16 @@ public class SnykStepFlow {
 
     context.getEnvVars().put("SNYK_TOKEN", SnykApiToken.getToken(context, config.getSnykTokenId()));
 
-    int testExitCode = SnykTest.testProject(context, config, installation);
+    String testJson = SnykTest.testProject(context, config, installation, testExitCode);
+    String report = SnykToHTML.generateReport(context, installation, testJson);
+
+    Run<?, ?> run = context.getRun();
+    if (run.getActions(SnykReportBuildAction.class).isEmpty()) {
+      run.addAction(new SnykReportBuildAction(report));
+    }
 
     if (config.isMonitorProjectOnBuild()) {
       SnykMonitor.monitorProject(context, config, installation);
     }
-
-    SnykToHTML.generateReport(context, installation);
-
-    Run<?, ?> run = context.getRun();
-    if (run.getActions(SnykReportBuildAction.class).isEmpty()) {
-      run.addAction(new SnykReportBuildAction(run));
-    }
-
-    FilePath workspace = context.getWorkspace();
-    Launcher launcher = context.getLauncher();
-    TaskListener listener = context.getTaskListener();
-    ArtifactArchiver artifactArchiver = new ArtifactArchiver(workspace.getName() + "_" + SNYK_REPORT_HTML);
-    artifactArchiver.perform(run, workspace, launcher, listener);
-
-    return testExitCode;
   }
 }

@@ -1,20 +1,16 @@
 <?jelly escape-by-default="true"?>
 <j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:l="/lib/layout">
   <l:layout title="Snyk Security Report" norefresh="true">
-
     <l:side-panel>
       <st:include page="sidepanel.jelly" it="${it.run}" optional="true"/>
     </l:side-panel>
-
     <l:main-panel>
       <h3>Reports</h3>
-      <j:forEach var="artifact" items="${it.run.artifacts}">
-        <j:if test="${artifact.toString().indexOf('snyk_report.html') != -1}">
-          <a href="report#${artifact}">${artifact.toString().replace("_snyk_report.html", "")}</a>
-          <br/>
-        </j:if>
-      </j:forEach>
+      <ul>
+        <li>
+          <a href="./report">View report</a>
+        </li>
+      </ul>
     </l:main-panel>
-
   </l:layout>
 </j:jelly>
