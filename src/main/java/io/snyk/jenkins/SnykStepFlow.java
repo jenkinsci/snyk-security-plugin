@@ -15,8 +15,6 @@ import io.snyk.jenkins.tools.SnykInstallation;
 import java.io.IOException;
 import java.util.function.Supplier;
 
-import static io.snyk.jenkins.config.SnykConstants.SNYK_REPORT_HTML;
-
 public class SnykStepFlow {
 
   public static void perform(SnykConfig config, Supplier<SnykContext> contextSupplier) throws SnykIssueException, SnykErrorException {
@@ -61,19 +59,26 @@ public class SnykStepFlow {
       SnykMonitor.monitorProject(context, config, installation);
     }
 
-    SnykToHTML.generateReport(context, installation);
+    FilePath report = SnykToHTML.generateReport(context, installation);
+    archiveReport(context, report);
+    addSidebarLink(context);
 
+    return testExitCode;
+  }
+
+  private static void archiveReport(SnykContext context, FilePath report) throws IOException, InterruptedException {
+    Run<?, ?> run = context.getRun();
+    FilePath workspace = context.getWorkspace();
+    Launcher launcher = context.getLauncher();
+    TaskListener listener = context.getTaskListener();
+    new ArtifactArchiver(report.getName())
+      .perform(run, workspace, launcher, listener);
+  }
+
+  private static void addSidebarLink(SnykContext context) {
     Run<?, ?> run = context.getRun();
     if (run.getActions(SnykReportBuildAction.class).isEmpty()) {
       run.addAction(new SnykReportBuildAction(run));
     }
-
-    FilePath workspace = context.getWorkspace();
-    Launcher launcher = context.getLauncher();
-    TaskListener listener = context.getTaskListener();
-    ArtifactArchiver artifactArchiver = new ArtifactArchiver(workspace.getName() + "_" + SNYK_REPORT_HTML);
-    artifactArchiver.perform(run, workspace, launcher, listener);
-
-    return testExitCode;
   }
 }
